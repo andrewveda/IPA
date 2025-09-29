@@ -77,9 +77,9 @@ let similarityScores = [];
 
 // Example IPA sounds (sentence is hidden from student)
 const ipaSounds = [
-  { symbol: "/p/ papa, paper, park, puppy", sentence: "I used a pen, saw a map, and ate an apple.", key: "pen" },
-  { symbol: "/p/ park, puppy, people", sentence: "The puppy played in the park with the people.", key: "puppy" },
-  { symbol: "/p/ papa, pen, paper", sentence: "Papa picked up a pen and a piece of paper.", key: "papa" },
+  { symbol: "/p/ papa, paper, park, puppy", sentence: "I used a pen, saw a map, and ate an apple.", key: "I used a pen, saw a map, and ate an apple." },
+  { symbol: "/p/ park, puppy, people", sentence: "The puppy played in the park with the people.", key: "The puppy played in the park with the people." },
+  { symbol: "/p/ papa, pen, paper", sentence: "Papa picked up a pen and a piece of paper.", key: "Papa picked up a pen and a piece of paper" },
 ];
 
 // Mini IPA dictionary (UK)
@@ -139,7 +139,7 @@ function initIPATrainer() {
 function playTeacherVoice(word) {
   const utterance = new SpeechSynthesisUtterance(word);
   utterance.lang = "en-GB";   // British English
-  utterance.rate = 0.9;       // Slightly slower for clarity
+  utterance.rate = 1.1;       // Slightly slower for clarity
   utterance.pitch = 1;
   const voices = speechSynthesis.getVoices();
   const ukVoice = voices.find(v => v.lang === "en-GB");
