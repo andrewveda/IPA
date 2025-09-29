@@ -1,0 +1,249 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>SRM Valliammai Engineering College - IPA Trainer</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      background: #f4f4f4;
+      padding: 20px;
+      text-align: center;
+    }
+    .container {
+      background: #fff;
+      padding: 20px;
+      border-radius: 10px;
+      box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+      margin: 20px auto;
+      max-width: 700px;
+      text-align: left;
+    }
+    input, button {
+      padding: 10px;
+      margin: 10px 0;
+      font-size: 16px;
+    }
+    button {
+      cursor: pointer;
+      border: none;
+      border-radius: 5px;
+      background-color: #333;
+      color: white;
+    }
+    .success { color: green; font-weight: bold; }
+    .fail { color: red; font-weight: bold; }
+    .ipa-block { background: #fff; border-radius: 10px; padding: 15px; margin: 10px 0; box-shadow: 0 2px 5px rgba(0,0,0,0.1);}
+    .feedback { font-weight: bold; margin-top: 5px; }
+    #timer { font-size: 1.2rem; margin: 1rem 0; color: #d9534f; }
+    #scoreCard p { font-size: 1.1rem; }
+  </style>
+</head>
+<body>
+
+<h1>SRM Valliammai Engineering College</h1>
+
+<!-- Name Entry -->
+<div class="container" id="name-container">
+  <h2>Enter Your Name</h2>
+  <input type="text" id="playerName" placeholder="Your Name">
+  <br>
+  <button onclick="submitName()">Start Quest</button>
+  <p id="name-feedback"></p>
+</div>
+
+<!-- IPA Trainer -->
+<div class="container" id="ipa-trainer-container" style="display:none;">
+  <h2>IPA Pronunciation Trainer</h2>
+  <div id="timer">⏳ Time: 0s</div>
+  <div id="ipa-container"></div>
+  <button onclick="finishQuest()">✅ Submit Results</button>
+</div>
+
+<!-- Scorecard -->
+<div class="container" id="score-container" style="display:none;">
+  <h2>🎉 Quest Completed!</h2>
+  <div id="scoreCard"></div>
+  <button onclick="restartQuest()">🔄 Restart</button>
+</div>
+
+<script>
+// ----- GLOBAL VARIABLES -----
+let playerName = "";
+let startTime = 0;
+let timerInterval;
+let similarityScores = [];
+
+// Example IPA sounds (sentence is hidden from student)
+const ipaSounds = [
+  { symbol: "/p/ papa, paper, park, puppy", sentence: "I used a pen, saw a map, and ate an apple.", key: "pen" },
+  { symbol: "/p/ park, puppy, people", sentence: "The puppy played in the park with the people.", key: "puppy" },
+  { symbol: "/p/ papa, pen, paper", sentence: "Papa picked up a pen and a piece of paper.", key: "papa" },
+];
+
+// Mini IPA dictionary (UK)
+const ipaDict = {
+  "pen": "pɛn", "map": "mæp", "apple": "ˈæpl̩",
+  "dog": "dɒg", "add": "æd", "ride": "raɪd",
+  "cat": "kæt", "back": "bæk", "cake": "keɪk",
+  "ball": "bɔːl", "table": "ˈteɪbl̩", "cab": "kæb",
+  "top": "tɒp", "tea": "tiː"
+};
+
+// ----- NAME ENTRY -----
+function submitName() {
+  playerName = document.getElementById("playerName").value.trim();
+  const feedback = document.getElementById("name-feedback");
+  if(!playerName){
+    feedback.textContent = "Please enter your name!";
+    feedback.className = "fail";
+    return;
+  }
+  feedback.textContent = "";
+  document.getElementById("name-container").style.display = "none";
+  document.getElementById("ipa-trainer-container").style.display = "block";
+  startTime = Date.now();
+  startTimer();
+  initIPATrainer();
+}
+
+// ----- TIMER -----
+function startTimer(){
+  timerInterval = setInterval(()=>{
+    const elapsed = Math.floor((Date.now()-startTime)/1000);
+    document.getElementById("timer").innerText = `⏳ Time: ${elapsed}s`;
+  },1000);
+}
+function stopTimer(){ clearInterval(timerInterval); }
+
+// ----- IPA TRAINER -----
+function initIPATrainer() {
+  const container = document.getElementById("ipa-container");
+  ipaSounds.forEach((item,index)=>{
+    const block = document.createElement("div");
+    block.className = "ipa-block";
+    block.innerHTML = `
+      <p><strong>IPA:</strong> ${item.symbol}</p>
+      <div>
+        <button onclick="playTeacherVoice('${item.key}')">🎙️ Listen & Repeat</button>
+        <button onclick="startRecognition(${index})">🎤 Repeat</button>
+        <div class="feedback" id="feedback-${index}"></div>
+      </div>
+    `;
+    container.appendChild(block);
+  });
+}
+
+// ----- TEACHER VOICE (Computer Generated) -----
+function playTeacherVoice(word) {
+  const utterance = new SpeechSynthesisUtterance(word);
+  utterance.lang = "en-GB";   // British English
+  utterance.rate = 0.9;       // Slightly slower for clarity
+  utterance.pitch = 1;
+  const voices = speechSynthesis.getVoices();
+  const ukVoice = voices.find(v => v.lang === "en-GB");
+  if (ukVoice) utterance.voice = ukVoice;
+  speechSynthesis.speak(utterance);
+}
+
+// ----- SPEECH RECOGNITION -----
+const recognition = new (window.SpeechRecognition || window.webkitSpeechRecognition)();
+recognition.lang = "en-GB";
+recognition.interimResults = false;
+
+function startRecognition(index){
+  const expectedSentence = ipaSounds[index].sentence; // hidden from student
+  recognition.start();
+  recognition.onresult = (event)=>{
+    const spoken = event.results[0][0].transcript.trim().toLowerCase();
+    checkAnswer(spoken, expectedSentence, index);
+  };
+  recognition.onerror = (event)=>{
+    const feedback = document.getElementById(`feedback-${index}`);
+    feedback.textContent = `⚠️ Error: ${event.error}`;
+    feedback.className = "fail";
+  };
+}
+
+// ----- CHECK ANSWER -----
+function checkAnswer(spoken, expected, index){
+  const feedback = document.getElementById(`feedback-${index}`);
+  const expectedIPA = expected.split(" ").map(w => ipaDict[w] || w).join(" ");
+  const spokenIPA = spoken.split(" ").map(w => ipaDict[w] || w).join(" ");
+  const similarity = compareText(spokenIPA, expectedIPA);
+  similarityScores[index] = similarity;
+  if(similarity >= 0.7){
+    feedback.textContent = `✅ Correct! (${Math.round(similarity*100)}%)`;
+    feedback.className = "success";
+  } else {
+    feedback.textContent = `❌ Incorrect (${Math.round(similarity*100)}%)`;
+    feedback.className = "fail";
+  }
+}
+
+// ----- LEVENSHTEIN -----
+function compareText(a,b){
+  const longer = a.length > b.length ? a : b;
+  const shorter = a.length > b.length ? b : a;
+  if(longer.length === 0) return 1.0;
+  return (longer.length - editDistance(longer, shorter)) / parseFloat(longer.length);
+}
+function editDistance(s1,s2){
+  s1 = s1.toLowerCase(); s2 = s2.toLowerCase();
+  const costs = [];
+  for(let i=0;i<=s1.length;i++){
+    let lastValue=i;
+    for(let j=0;j<=s2.length;j++){
+      if(i===0) costs[j]=j;
+      else{
+        if(j>0){
+          let newValue=costs[j-1];
+          if(s1.charAt(i-1)!==s2.charAt(j-1)){
+            newValue=Math.min(Math.min(newValue,lastValue),costs[j])+1;
+          }
+          costs[j-1]=lastValue;
+          lastValue=newValue;
+        }
+      }
+    }
+    if(i>0) costs[s2.length]=lastValue;
+  }
+  return costs[s2.length];
+}
+function finishQuest(){
+  stopTimer();
+  const totalTime = Math.floor((Date.now()-startTime)/1000);
+  const avgSimilarity = similarityScores.length > 0 
+    ? similarityScores.reduce((a,b)=>a+b,0) / similarityScores.length 
+    : 0;
+  const percentage = Math.round(avgSimilarity * 100);
+
+  document.getElementById("ipa-trainer-container").style.display = "none";
+  document.getElementById("score-container").style.display = "block";
+  document.getElementById("scoreCard").innerHTML = `
+    <p>👤 Player: ${playerName}</p>
+    <p>📊 Average Accuracy: ${percentage}%</p>
+    <p>⏱️ Time Taken: ${totalTime} seconds</p>
+  `;
+
+  // ----- SEND ACCURACY TO GOOGLE SHEET -----
+  fetch("https://script.google.com/macros/s/AKfycbwseKlRX_H_8BO7ZW30JZVhUMNq1iimlTwvINSNa8CsInxBNs4Iy0MLJqNzPIWpxakJ/exec", {
+    method: "POST",
+    mode: "no-cors",
+    headers: {"Content-Type":"application/json"},
+    body: JSON.stringify({
+      questId: "IPA 1",
+      name: playerName,
+      correct: (percentage),
+      wrong: 100-(percentage),
+      time: totalTime
+    })
+  });
+}
+
+// ----- RESTART -----
+function restartQuest(){ location.reload(); }
+</script>
+</body>
+</html>
